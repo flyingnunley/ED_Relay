@@ -8,7 +8,7 @@ volatile unsigned long UnixTimestamp = 0;	// GLOBALTIME  ( Will be set by NTP)
 int cNTP_Update = 0;											// Counter for Updating the time via NTP
 volatile unsigned long cHeartbeat = 0;    // Counter for heartbeat (updated by NTP)
 Ticker tkSecond;												  // Second - Timer for Updating Datetime Structure
-
+unsigned long WiFiunconnectedTime = 0;
 #define LED_esp 2
 
 //custom declarations

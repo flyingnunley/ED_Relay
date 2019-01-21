@@ -2,7 +2,8 @@
 const char PAGE_Style_css[] PROGMEM = R"=====(
 body { color: #000000; font-family: avenir, helvetica, arial, sans-serif;  letter-spacing: 0.15em;} 
 hr {    background-color: #eee;    border: 0 none;   color: #eee;    height: 1px; } 
-.btn, .btn:link, .btn:visited {  
+.btn, .btn:link, .btn:visited 
+{  
 	border-radius: 0.3em;  
 	border-style: solid;  
 	border-width: 1px;  
@@ -17,18 +18,20 @@ padding: 1em 0.75em;
 	-webkit-transition: color 0.4s, background-color 0.4s, border 0.4s;  
 transition: color 0.4s, background-color 0.4s, border 0.4s; 
 } 
-.btn:hover, .btn:focus {
+.btn:hover, .btn:focus 
+{
 color: #7FDBFF;  
 border: 1px solid #7FDBFF;  
 	-webkit-transition: background-color 0.3s, color 0.3s, border 0.3s;  
 transition: background-color 0.3s, color 0.3s, border 0.3s; 
 }
-	.btn:active {  
+	.btn:active 
+{  
 color: #0074D9;  
 border: 1px solid #0074D9;  
 		-webkit-transition: background-color 0.3s, color 0.3s, border 0.3s;  
 transition: background-color 0.3s, color 0.3s, border 0.3s; 
-	} 
+} 
 	.btn--s 
 	{  
 		font-size: 12px; 

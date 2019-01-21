@@ -9,6 +9,7 @@ const char PAGE_AdminMainPage[] PROGMEM = R"=====(
 <strong>Administration</strong>
 <hr>
 <a href="general.html" style="width:250px" class="btn btn--m btn--blue" >General Configuration</a><br>
+<a href="schedule.html" style="width:250px" class="btn btn--m btn--blue" >Schedule Configuration</a><br>
 <a href="config.html" style="width:250px" class="btn btn--m btn--blue" >Network Configuration</a><br>
 <a href="info.html"   style="width:250px"  class="btn btn--m btn--blue" >Network Information</a><br>
 <a href="ntp.html"   style="width:250px"  class="btn btn--m btn--blue" >NTP Settings</a><br>
