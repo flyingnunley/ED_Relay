@@ -54,8 +54,6 @@
   }
 #endif
 
-
-
 class ESPBASE {
 public:
     bool WIFI_connected, CFG_saved;
@@ -85,12 +83,14 @@ public:
 #include "Page_Information.h"
 #include "Page_General.h"
 #include "PAGE_NetworkConfiguration.h"
+#include "Page_Schedule.h"
+#include "Page_Status.h"
 #define DEVICE_TYPE "EDRelay"
 
 //char tmpESP[100];
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttSubscribe();
-String verstr = "ESP_EDRelayBoard ver 1.5";
+String verstr = "ED_Relay ver 2.4";
 String HeartbeatTopic;
 
 void ESPBASE::initialize(){
@@ -100,7 +100,6 @@ void ESPBASE::initialize(){
   uint8_t timeoutClick = 50;
   mqttClient = new PubSubClient(espClient);
   String chipID;
-
   // define parameters storage
   #ifdef ARDUINO_ESP32_DEV
     EEPROM.begin("ESPBASE", false);
@@ -139,6 +138,7 @@ void ESPBASE::initialize(){
       {
           Serial.println("Connection Failed! activating to AP mode...");
           WIFI_connected = false;
+          WiFiunconnectedTime = millis();
       }
       else
       {
@@ -175,7 +175,7 @@ void ESPBASE::initialize(){
     #elif ARDUINO_ESP8266_ESP01 || ARDUINO_ESP8266_NODEMCU
       tkSecond.attach(1, ISRsecondTick);
     #endif
-
+    cNTP_Update = config.Update_Time_Via_NTP_Every * 60 - 10;
     Serial.println("Ready");
 
 }
@@ -202,6 +202,8 @@ void ESPBASE::httpSetup(){
 
   //server.on ( "/appl.html", send_application_configuration_html  );
   server.on ( "/general.html", send_general_html  );
+  server.on ( "/schedule.html", send_schedule_html  );
+  server.on ("/status.html", send_status_html);
   //  server.on ( "/example.html", []() { server.send_P ( 200, "text/html", PAGE_EXAMPLE );  } );
   server.on ( "/style.css", []() {
     Serial.println("style.css");
@@ -217,6 +219,7 @@ void ESPBASE::httpSetup(){
   server.on ( "/admin/ntpvalues", send_NTP_configuration_values_html );
   //server.on ( "/admin/applvalues", send_application_configuration_values_html );
   server.on ( "/admin/generalvalues", send_general_configuration_values_html);
+  server.on ( "/admin/schedulevalues", send_schedule_configuration_values_html);
   server.on ( "/admin/devicename",     send_devicename_value_html);
   server.on ( "/restart.html", restartesp);
   server.onNotFound ( []() {
@@ -235,6 +238,7 @@ void ESPBASE::OTASetup(){
           Serial.println("Start");
         });
       ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        customWatchdog = millis();
         Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
       });
       ArduinoOTA.onEnd([]() { // do a fancy thing with our board led at end
@@ -283,9 +287,9 @@ void ESPBASE::setupMQTTClient() {
 
 void ESPBASE::mqttSend(String topic,String preface,String msg)
 {
-  Serial.println(topic);
-  Serial.println(preface);
-  Serial.println(msg);
+//  Serial.println(topic);
+//  Serial.println(preface);
+//  Serial.println(msg);
   String soutput=preface+msg;
   char mybytes[soutput.length()+1];
   char topicbytes[topic.length()+1];
@@ -309,6 +313,7 @@ void ESPBASE::loop()
 
   if(WIFI_connected)
   {
+    WiFiunconnectedTime = 0;
     if(config.MQTTServer != "")
     {
       if (!mqttClient->connected()) 
@@ -335,7 +340,43 @@ void ESPBASE::loop()
       if(cHeartbeat >= config.HeartbeatEvery and config.HeartbeatEvery > 0)
       {
         cHeartbeat = 0;
-        mqttSend(HeartbeatTopic,""," Still Here");
+        String message = " Still Here ";
+        mqttSend(HeartbeatTopic,"",message);
+      }
+      if(config.Update_Time_Via_NTP_Every <= 0)
+        config.Update_Time_Via_NTP_Every = 1;
+      if(cNTP_Update > config.Update_Time_Via_NTP_Every * 60)
+      {
+        unsigned long oldtimestamp = UnixTimestamp;
+        cNTP_Update = 0;
+        getNTPtime();
+        Serial.println("Time variance = " + String(UnixTimestamp-oldtimestamp));
+        mqttSend("Timevarience "+config.DeviceName,String(UnixTimestamp-oldtimestamp),"");
+        if(UnixTimestamp-oldtimestamp > 2 && config.Update_Time_Via_NTP_Every > 0)
+        {
+          config.Update_Time_Via_NTP_Every--;
+        }
+        if(UnixTimestamp-oldtimestamp < 2)
+        {
+          config.Update_Time_Via_NTP_Every++;
+        }
+        SetSuriseset();
+        if(!suntime.valid)
+          cNTP_Update = config.Update_Time_Via_NTP_Every * 60;
+      }
+    }
+  }
+  else
+  {
+    if(WiFiunconnectedTime == 0)
+    {
+      WiFiunconnectedTime = millis();
+    }
+    else
+    {
+      if(millis() > WiFiunconnectedTime + 60000)
+      {
+              ESP.restart();
       }
     }
   }

@@ -1,6 +1,18 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
-#define CFGVER "R1.0"
+#define CFGVER "R1.1"
+#define PROGMEM_LATE __attribute__ (( __section__(".fini1") ))
+
+typedef struct strSched 
+{
+  int onHour;
+  int onMin;
+  int offHour;
+  int offMin;
+  bool wdays[7];
+  bool onatsunset;
+  bool offatsunrise;
+} Sched;
 
 struct strConfig {
   boolean dhcp;                         // 1 Byte - EEPROM 16
@@ -17,22 +29,59 @@ struct strConfig {
   String OTApwd;                         // up to 32 Byte - EEPROM 192
   String MQTTServer;                    // up to 32 Byte - EEPROM 224
   long MQTTPort;                        // 4 Byte - EEPROM 256
-  String NotUsed5;                   // up to 32 Byte - EEPROM 260
-  String Relay1Name;                 // up to 16 Byte - EEPROM 292
-  String Relay2Name;                 // up to 16 Byte - EEPROM 308
-  String NotUsed1;                 // up to 16 Byte - EEPROM 324
-  String NotUsed2;                 // up to 16 Byte - EEPROM 340
-  String NotUsed3;                 // up to 16 Byte - EEPROM 356
-  String NotUsed4;                 // up to 16 Byte - EEPROM 372
-  String NotUsed6;                   // up to 32 Byte - EEPROM 388
-  String NotUsed7;                // up to 32 Byte - EEPROM 420
-  long HeartbeatEvery;                  // 4 Byte - EEPROM 452
-  // Application Settings here... from EEPROM 456 up to 511 (0 - 511)
-
+  long HeartbeatEvery;                  // 4 Byte - EEPROM 260
+  boolean ReportTime;                   // 1 Byte - EEPROM 264
+  // Application Settings here... from EEPROM 263 up to 511 (0 - 511)
+  boolean R1OffAtSunrise;               // 1 byte - EEPROM 265
+  boolean R1OnAtSunset;                   // 1 Byte - EEPROM 266
+  boolean R2OffAtSunrise;               // 1 Byte - EEPROM 267
+  boolean R2OnAtSunset;                 // 1 Byte - EEPROM 268
+  String Relay1Name;                 // up to 16 Byte - EEPROM 349
+  String Relay2Name;                 // up to 16 Byte - EEPROM 365
+  Sched RSchedule[2][10];                     // 40 Bytes EEPROM 269
 } config;
+
+long packSched(Sched shed)
+{
+  long packed = shed.onHour;
+  packed = (((((packed << 6) + shed.onMin) << 5) + shed.offHour) << 6) + shed.offMin;
+  packed = packed << 9 | ((shed.onatsunset<<8)+(shed.offatsunrise<<7)+(shed.wdays[6]<<6)+(shed.wdays[0]<<5)+(shed.wdays[1]<<4)+(shed.wdays[2]<<3)+(shed.wdays[3]<<2)+(shed.wdays[4]<<1)+(shed.wdays[5]));
+  Serial.println(String(packed));
+  return packed;
+}
+
+Sched unpackSched(long packed)
+{
+  Sched shed;
+
+  Serial.println(String(packed));
+  int days = packed & 0x01ff;
+  shed.onatsunset = (days >> 8) & 1;
+  shed.offatsunrise = (days >> 7) & 1;
+  shed.wdays[6] = (days >> 6) & 1;
+  shed.wdays[0] = (days >> 5) & 1;
+  shed.wdays[1] = (days >> 4) & 1;
+  shed.wdays[2] = (days >> 3) & 1;
+  shed.wdays[3] = (days >> 2) & 1;
+  shed.wdays[4] = (days >> 1) & 1;
+  shed.wdays[5] = days & 1;
+  shed.onHour = (packed >> 26) & 0x1f;
+  shed.onMin = (packed >> 20) & 0x3f;
+  shed.offHour = (packed >> 15) & 0x1f;
+  shed.offMin = (packed >> 9) & 0x3f;
+  return shed;
+}
 
   //  Auxiliar function to handle EEPROM
   // EEPROM-parameters
+  void EEPROMWriteint(int address, int value){
+    byte two = (value & 0xFF);
+    byte one = ((value >> 8) & 0xFF);
+
+    //Write the 4 bytes into the eeprom memory.
+    EEPROM.write(address, two);
+    EEPROM.write(address + 1, one);
+  }
 
   void EEPROMWritelong(int address, long value){
     byte four = (value & 0xFF);
@@ -45,6 +94,15 @@ struct strConfig {
     EEPROM.write(address + 1, three);
     EEPROM.write(address + 2, two);
     EEPROM.write(address + 3, one);
+  }
+
+  int EEPROMReadint(long address){
+    //Read the 4 bytes from the eeprom memory.
+    long two = EEPROM.read(address);
+    long one = EEPROM.read(address + 1);
+
+    //Return the recomposed long by using bitshift.
+    return ((two << 0) & 0xFF) + ((one << 8) & 0xFFFF);
   }
 
   long EEPROMReadlong(long address){
@@ -84,6 +142,7 @@ struct strConfig {
   }
 
   void WriteConfig(){
+//    Serial.println("Saving config");
     String cfgver = CFGVER;
     char ccfgver[5];
     cfgver.toCharArray(ccfgver,5);
@@ -123,14 +182,23 @@ struct strConfig {
     WriteStringToEEPROM(192, config.OTApwd);
     WriteStringToEEPROM(224, config.MQTTServer);
     EEPROMWritelong(256, config.MQTTPort);
-    WriteStringToEEPROM(292, config.Relay1Name);                 // up to 16 Byte - EEPROM 292
-    WriteStringToEEPROM(308, config.Relay2Name);                 // up to 16 Byte - EEPROM 308
-    EEPROMWritelong(452, config.HeartbeatEvery);
+    EEPROMWritelong(260, config.HeartbeatEvery);
+    EEPROM.write(264,config.ReportTime);    
+    EEPROM.write(265, config.R1OffAtSunrise);
+    EEPROM.write(266,config.R1OnAtSunset);         
+    EEPROM.write(267, config.R2OffAtSunrise);
+    EEPROM.write(268,config.R2OnAtSunset);         
+    for(int i=0;i<10;i++)
+    {
+      EEPROMWritelong(269+(i*4),packSched(config.RSchedule[0][i]));
+      EEPROMWritelong(309+(i*4),packSched(config.RSchedule[1][i]));
+    }
+    WriteStringToEEPROM(349, config.Relay1Name);                 // up to 16 Byte - EEPROM 292
+    WriteStringToEEPROM(365, config.Relay2Name);                 // up to 16 Byte - EEPROM 308
 
       // Application Settings here... from EEPROM 392 up to 511 (0 - 511)
 
     EEPROM.commit();
-
   }
 
   boolean ReadConfig(){
@@ -164,9 +232,20 @@ struct strConfig {
       config.OTApwd = ReadStringFromEEPROM(192);
       config.MQTTServer = ReadStringFromEEPROM(224);
       config.MQTTPort = EEPROMReadlong(256);
-      config.Relay1Name = ReadStringFromEEPROM(292);                 // up to 16 Byte - EEPROM 292
-      config.Relay2Name = ReadStringFromEEPROM(308);                 // up to 16 Byte - EEPROM 308
-      config.HeartbeatEvery = EEPROMReadlong(452);
+      config.HeartbeatEvery = EEPROMReadlong(260);
+      config.ReportTime = EEPROM.read(264);                   // 1 Byte - EEPROM 262
+      config.ReportTime = false;
+      config.R1OffAtSunrise = EEPROM.read(265);
+      config.R1OnAtSunset = EEPROM.read(266);                   // 1 Byte - EEPROM 261
+      config.R2OffAtSunrise = EEPROM.read(267);
+      config.R2OnAtSunset = EEPROM.read(268);                   // 1 Byte - EEPROM 261
+      for(int i=0;i<10;i++)
+      {
+        config.RSchedule[0][i] = unpackSched(EEPROMReadlong(269+(i*4)));
+        config.RSchedule[1][i] = unpackSched(EEPROMReadlong(309+(i*4)));
+      }
+      config.Relay1Name = ReadStringFromEEPROM(349);                 // up to 16 Byte - EEPROM 292
+      config.Relay2Name = ReadStringFromEEPROM(365);                 // up to 16 Byte - EEPROM 308
       // Application parameters here ... from EEPROM 456 to 511
 
       return true;
@@ -178,33 +257,6 @@ struct strConfig {
       return false;
     }
   }
-
-void printConfig(){
-
-  Serial.println("Printing Config");
-
-  Serial.printf("DHCP:%d\n", config.dhcp);
-  Serial.printf("DayLight:%d\n", config.isDayLightSaving);
-
-  Serial.printf("NTP update every %ld sec\n", config.Update_Time_Via_NTP_Every); // 4 Byte
-  Serial.printf("Timezone %ld\n", config.timeZone); // 4 Byte
-
-  Serial.printf("IP:%d.%d.%d.%d\n", config.IP[0],config.IP[1],config.IP[2],config.IP[3]);
-  Serial.printf("Mask:%d.%d.%d.%d\n", config.Netmask[0],config.Netmask[1],config.Netmask[2],config.Netmask[3]);
-  Serial.printf("Gateway:%d.%d.%d.%d\n", config.Gateway[0],config.Gateway[1],config.Gateway[2],config.Gateway[3]);
-
-
-  Serial.printf("SSID:%s\n", config.ssid.c_str());
-  Serial.printf("PWD:%s\n", config.password.c_str());
-  Serial.printf("ntp ServerName:%s\n", config.ntpServerName.c_str());
-  Serial.printf("Device Name:%s\n", config.DeviceName.c_str());
-  Serial.printf("OTA password:%s\n", config.OTApwd.c_str());
-  Serial.printf("MQTT Server:%s\n", config.MQTTServer.c_str());
-  Serial.printf("MQTT Port:%ld\n", config.MQTTPort);
-  Serial.printf("Heartbeat Every %ld seconds",config.HeartbeatEvery);
-    // Application Settings here... from EEPROM 456 up to 511 (0 - 511)
-
-}
 
 String formatConfig(){
   String outstring = "";
@@ -238,7 +290,7 @@ void configLoadDefaults(uint16_t ChipId){
   config.IP[0] = 192; config.IP[1] = 168; config.IP[2] = 1; config.IP[3] = 100;
   config.Netmask[0] = 255; config.Netmask[1] = 255; config.Netmask[2] = 255; config.Netmask[3] = 0;
   config.Gateway[0] = 192; config.Gateway[1] = 168; config.Gateway[2] = 1; config.Gateway[3] = 254;
-  config.ntpServerName = "0.ch.pool.ntp.org"; //"0.ch.pool.ntp.org"; // to be adjusted to PT ntp.ist.utl.pt
+  config.ntpServerName = "0.ubuntu.pool.ntp.org"; //"0.ch.pool.ntp.org"; // to be adjusted to PT ntp.ist.utl.pt
   config.Update_Time_Via_NTP_Every =  5;
   config.timeZone = 1;
   config.isDayLightSaving = true;

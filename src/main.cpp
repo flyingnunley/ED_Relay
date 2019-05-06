@@ -1,24 +1,26 @@
 #include <Arduino.h>
 #include <PubSubClient.h>
-
 #include "ESPBASE.h"
+#include "relay.h"
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 const byte mqttDebug = 1;
-//const int ESP_BUILTIN_LED = 1;
 #define RELAY1_PIN 12
 #define RELAY2_PIN 13
 #define STATUS_LED 16
-byte relay1state = 0;
-byte relay2state = 0;
+relay* Relay[2];
 String sChipID;
-long lastReconnectAttempt = 0;
-int rbver = 0;
+long lastReconnectAttempt = 0;         // used for a millisecond timer to reconnect to mqtt broker if disconnected
+unsigned long lastschedulecheck = 0;  // used for a millisecond timer to check the schedule for relay changes every 60 seconds
 String RelayTopic;
 String StatusTopic;
+unsigned long reporttimemilli = 600000;
+unsigned long lastreporttime = 0;
+String ScheduleTopic;
 
 ESPBASE Esp;
+void sendStatus();
 
 void setup() {
   Serial.begin(115200);
@@ -29,18 +31,103 @@ void setup() {
   Esp.initialize();
   RelayTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/command";
   StatusTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/status";
+  ScheduleTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/schedule";
+  Relay[0] = new relay(RELAY1_PIN,config.Relay1Name);
+  Relay[1] = new relay(RELAY2_PIN,config.Relay2Name);
   Esp.setupMQTTClient();
   customWatchdog = millis();
 
-  pinMode(RELAY1_PIN,OUTPUT);
-  pinMode(RELAY2_PIN,OUTPUT);
- 
   Serial.println("Done with setup");
   Serial.println(config.ssid);
 }
 
-void loop() {
+void setSchedule(int relay)
+{
+  if(suntime.valid && UnixTimestamp > 100000)
+  {
+    long tmnow = (DateTime.hour*60+DateTime.minute) * 60;
+    Serial.println("now " + String(DateTime.hour) + ":" + String(DateTime.minute) + " tz " + config.timeZone);
+    long nexton = 86401;
+    int noshed = -1;
+  //  Serial.println(String(DateTime.hour) + ":"+String(DateTime.minute));
+    for(int i=0;i<10;i++)
+    {
+      if(i < 2)
+      {
+// for each of the scheduled times, set the on and off time to sunset/rise as configured.  
+// only the first two schedules can be set this way.
+        if(config.RSchedule[relay][i].onatsunset)
+        {
+          config.RSchedule[relay][i].onHour = suntime.setHour;
+          config.RSchedule[relay][i].onMin = suntime.setMin;
+        }  
+        if(config.RSchedule[relay][i].offatsunrise)
+        {
+          config.RSchedule[relay][i].offHour = suntime.riseHour;
+          config.RSchedule[relay][i].offMin = suntime.riseMin;
+        }
+      }  
+      if(config.RSchedule[relay][i].wdays[DateTime.wday-1]) // if the weekday is selected in the schedule
+      {
+        if(Relay[relay]->getonTime() == 0 && Relay[relay]->getoffTime() == 0)  // if the relay is not set to a schedule (last scheduled time complete)
+        {
+          long tmschedon = (config.RSchedule[relay][i].onHour*60+config.RSchedule[relay][i].onMin) * 60; // get the on time for this schedule
+          if(tmschedon > tmnow) // if its a future time
+          {
+            tmschedon = tmschedon - tmnow; // figure out now many seconds from now
+            if(tmschedon < nexton) // if this schedule is more current than the other ones checked
+            {
+              Serial.println("relay " + String(relay) + " schedule " + String(i) + " " + String(config.RSchedule[relay][i].onHour) + ":" + String(config.RSchedule[relay][i].onMin) + " " + String(tmschedon));
+              nexton = tmschedon; // set the next on time
+              noshed = i; // keep track of the current schedule
+            }
+          }
+        } 
+      }
+    } // once we get here, nexton is set to the closest on time in all the schedules
+    if(nexton < 86401) // if its within the day
+    {
+      Relay[relay]->setonTime(nexton);  // set the next on time counter in the relay
+      // now get the off time in the current schedule
+      long offseconds = (config.RSchedule[relay][noshed].offHour*60+config.RSchedule[relay][noshed].offMin) * 60; 
+      Serial.println(String(config.RSchedule[relay][noshed].offHour) + ":" + String(config.RSchedule[relay][noshed].offMin) + " " + String(offseconds));
+      offseconds = offseconds - tmnow;
+      Serial.println(String(offseconds));
+      if(offseconds < nexton) // if the off seconds is less than the on seconds, its assumed that the off must be after midnight.
+        offseconds = offseconds + 86400;  // add 24 hours
+      Serial.println(offseconds);
+      Relay[relay]->setoffTime(offseconds);
+      Serial.println("Set relay " + String(relay) + " schedule to on " + String(Relay[relay]->getonTime()) + " off " + String(Relay[relay]->getoffTime()));
+    }
+  }
+//  return false;
+}
+
+void loop() 
+{
   Esp.loop();
+  if(millis() > lastreporttime + reporttimemilli)
+  {
+    if(config.ReportTime)
+    {
+      Esp.mqttSend(String(DEVICE_TYPE) + "/" + config.DeviceName + "/time",String(DateTime.hour) + ":" + String(DateTime.minute) + ":" + String(DateTime.second),"");
+      for(int i=0;i<2;i++)
+      {
+        String sched = "Relay " + String(i) + " on " + String(Relay[i]->getonTime()) + " off " + String(Relay[i]->getoffTime());
+        Serial.println(sched);
+        Esp.mqttSend(String(DEVICE_TYPE) + "/" + config.DeviceName + "/schedule",sched," now " + String((DateTime.hour*60+DateTime.minute)*60));
+      }
+    }
+    lastreporttime = millis();
+  }
+  if(millis() > lastschedulecheck + 60000)
+  {
+    lastschedulecheck = millis();
+    for(int i=0;i<2;i++)
+    {
+      setSchedule(i);
+    }
+  }
 }
 
 String getSignalString()
@@ -60,90 +147,109 @@ String getSignalString()
 
 void sendStatus()
 {
-  String message = config.Relay1Name + ",1,";
-  if(relay1state == 1)
-    message = message + "on";
-  else
-    message = message + "off";
-  message = message + ":" + config.Relay2Name + ",2,";
-  if(relay2state == 1)
-    message = message + "on";
-  else
-    message = message + "off";
+  String message = "";
+  for(int i=0;i<2;i++)
+  {
+    if(i==1)
+      message = message + ":";
+    message = message + Relay[i]->getName() + "," + String(i) + ",";
+    if(Relay[i]->getState() == 1)
+      message = message + "on";
+    else
+      message = message + "off";
+  }
   Esp.mqttSend(StatusTopic,"",message);
+}
+
+String getValue(String data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length() - 1;
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   char c_payload[length];
   memcpy(c_payload, payload, length);
   c_payload[length] = '\0';
-  
+  int onseconds = 0;
+
   String s_topic = String(topic);
   String s_payload = String(c_payload);
+  if(s_payload.indexOf(",") > 0)
+  {
+    String payload = getValue(s_payload,',',0);
+    onseconds = getValue(s_payload,',',1).toInt();
+  }
 
   if(s_topic == "SendStat")
   {
     sendStatus();
   }
-  if (s_topic == RelayTopic || s_topic == "AllLights") {
+  if (s_topic == RelayTopic || s_topic == "AllLights" || s_topic == "computer/timer/event") 
+  {
+    if(s_payload == "sendtime")
+    {
+      Esp.mqttSend(String(DEVICE_TYPE) + "/" + config.DeviceName + "/time",String(DateTime.hour) + ":" + String(DateTime.minute) + ":" + String(DateTime.second)," sunrise " + String(suntime.riseHour)+ ":" + String(suntime.riseMin) + " sunset " + String(suntime.setHour)+ ":" + String(suntime.setMin));
+    }
     if(s_payload == "signal")
     {
       Esp.mqttSend(StatusTopic,sChipID," WiFi: " + getSignalString());
     }
     if(s_payload == "TOGGLE")
     {
-      if(relay1state == 1)
+      for(int i=0;i<2;i++)
       {
-        s_payload = "OFF";
-      }
-      else
-      {
-        s_payload = "ON";
+        Relay[i]->toggle();
       }
     }
     if(s_payload == "TOGGLE_1")
     {
-      if(relay1state == 1)
-      {
-        s_payload = "OFF_1";
-      }
-      else
-      {
-        s_payload = "ON_1";
-      }
+      Relay[0]->toggle();
     }
     if(s_payload == "TOGGLE_2")
     {
-      if(relay2state == 1)
-      {
-        s_payload = "OFF_2";
-      }
-      else
-      {
-        s_payload = "ON_2";
-      }
+      Relay[1]->toggle();
     }
     if(s_payload == "ON_1" || s_payload == "ON")
     {
-      relay1state = 1;
-      digitalWrite(RELAY1_PIN,HIGH);
+      Relay[0]->setState(1);
+      if(onseconds > 0)
+      {
+        if(Relay[0]->getoffTime() == 0)
+        {
+          Relay[0]->setoffTime(onseconds);
+        }
+      }
     }
     if(s_payload == "OFF_1" || s_payload == "OFF")
     {
-      relay1state = 0;
-      digitalWrite(RELAY1_PIN,LOW);
+      Relay[0]->setState(0);
     }
     if(s_payload == "ON_2" || s_payload == "ON")
     {
-      relay2state = 1;
-      digitalWrite(RELAY2_PIN,HIGH);
+      Relay[1]->setState(1);
+      if(onseconds > 0)
+      {
+        if(Relay[1]->getoffTime() == 0)
+        {
+          Relay[1]->setoffTime(onseconds);
+        }
+      }
     }
     if(s_payload == "OFF_2" || s_payload == "OFF")
     {
-      relay2state = 0;
-      digitalWrite(RELAY2_PIN,LOW);
+      Relay[1]->setState(0);
     }
-    sendStatus();
   }
 }
 
@@ -163,7 +269,21 @@ void mqttSubscribe()
       {
         Serial.println("Subscribed to AllLights");
       }
+      if (Esp.mqttClient->subscribe("computer/timer/event"))
+      {
+        Serial.println("Subscribed to computer/timer/event");
+      }
+      char buff[100];
+      ScheduleTopic.toCharArray(buff,100);
+      if (Esp.mqttClient->subscribe((const char *)buff))
+      {
+        Serial.println("Subscribed to " + ScheduleTopic);
+      }
     }
 }
 
-
+void mainTick()
+{
+  Relay[0]->tick();
+  Relay[1]->tick();
+}
