@@ -34,3 +34,7 @@ sudo nano /etc/raspimjpeg
 MP4Box Off
 
 
+9.6 x 5.6 x 2.3
+
+Esp01Relay/testsinglerelay2/status|test03,on*
+EDRelay/FirstEDRelay/status|HouseLeft,0,on:HouseRight,1,on*

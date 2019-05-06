@@ -46,6 +46,7 @@ long packSched(Sched shed)
   long packed = shed.onHour;
   packed = (((((packed << 6) + shed.onMin) << 5) + shed.offHour) << 6) + shed.offMin;
   packed = packed << 9 | ((shed.onatsunset<<8)+(shed.offatsunrise<<7)+(shed.wdays[6]<<6)+(shed.wdays[0]<<5)+(shed.wdays[1]<<4)+(shed.wdays[2]<<3)+(shed.wdays[3]<<2)+(shed.wdays[4]<<1)+(shed.wdays[5]));
+  Serial.println(String(packed));
   return packed;
 }
 
@@ -53,7 +54,8 @@ Sched unpackSched(long packed)
 {
   Sched shed;
 
-  byte days = packed & 0x01ff;
+  Serial.println(String(packed));
+  int days = packed & 0x01ff;
   shed.onatsunset = (days >> 8) & 1;
   shed.offatsunrise = (days >> 7) & 1;
   shed.wdays[6] = (days >> 6) & 1;
@@ -232,7 +234,7 @@ Sched unpackSched(long packed)
       config.MQTTPort = EEPROMReadlong(256);
       config.HeartbeatEvery = EEPROMReadlong(260);
       config.ReportTime = EEPROM.read(264);                   // 1 Byte - EEPROM 262
-//      config.ReportTime = true;
+      config.ReportTime = false;
       config.R1OffAtSunrise = EEPROM.read(265);
       config.R1OnAtSunset = EEPROM.read(266);                   // 1 Byte - EEPROM 261
       config.R2OffAtSunrise = EEPROM.read(267);

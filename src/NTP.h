@@ -42,6 +42,8 @@ strDateTime DateTime;                      // Global DateTime structure, will be
 const int NTP_PACKET_SIZE = 48;
 byte packetBuffer[ NTP_PACKET_SIZE];
 extern void mainTick();
+strDateTime ConvertUnixTimeStamp( unsigned long _tempTimeStamp);
+boolean summerTime(unsigned long _timeStamp );
 /***************************************************
 /*
  * © Francesco Potortì 2013 - GPLv3 - Revision: 1.13
@@ -177,6 +179,20 @@ void getNTPtime(){
   yield();
   if (_unixTime > 0) UnixTimestamp = _unixTime; // store universally available time stamp
   Serial.println(String(UnixTimestamp) + ":" + String(_unixTime));
+  unsigned long testtime = UnixTimestamp;
+/* for testing daylight savings time  
+  for(int i=0;i<20;i++)
+  {
+    testtime=testtime+3592000l;
+    strDateTime stesttime = ConvertUnixTimeStamp(testtime);
+    boolean dst = summerTime(testtime);
+    String sout = String(stesttime.day) + "/" + String(stesttime.month) + "/" + String(stesttime.year) + " " + String(stesttime.hour) + ":" + String(stesttime.minute) + ":" + String(stesttime.second);
+    if(dst)
+      sout = sout + " yes";
+    else
+      sout = sout + " no";
+    Serial.println(sout);
+  }*/
 }
 
 strDateTime ConvertUnixTimeStamp( unsigned long _tempTimeStamp) {
@@ -233,18 +249,29 @@ strDateTime ConvertUnixTimeStamp( unsigned long _tempTimeStamp) {
 }
 
 //
-// Summertime calculates the daylight saving time for middle Europe. Input: Unixtime in UTC
+// Summertime calculates the daylight saving time for United States. Input: Unixtime in UTC
 //
-boolean summerTime(unsigned long _timeStamp ) {
+boolean summerTime(unsigned long _timeStamp ) 
+{
   strDateTime  _tempDateTime = ConvertUnixTimeStamp(_timeStamp);
+  int x = (_tempDateTime.year + _tempDateTime.year / 4 + 2) % 7;
   // printTime("Innerhalb ", _tempDateTime);
 
-  if (_tempDateTime.month < 3 || _tempDateTime.month > 10) return false; // keine Sommerzeit in Jan, Feb, Nov, Dez
-  if (_tempDateTime.month > 3 && _tempDateTime.month < 10) return true; // Sommerzeit in Apr, Mai, Jun, Jul, Aug, Sep
-  if (_tempDateTime.month == 3 && (_tempDateTime.hour + 24 * _tempDateTime.day) >= (3 +  24 * (31 - (5 * _tempDateTime.year / 4 + 4) % 7)) || _tempDateTime.month == 10 && (_tempDateTime.hour + 24 * _tempDateTime.day) < (3 +  24 * (31 - (5 * _tempDateTime.year / 4 + 1) % 7)))
-    return true;
+  if (_tempDateTime.month < 3 || _tempDateTime.month > 11) return false; 
+  if (_tempDateTime.month > 3 && _tempDateTime.month < 11) return true; 
+  if (_tempDateTime.month == 3)
+  { 
+    if((_tempDateTime.day == (7 - x) && _tempDateTime.hour >= 2) || (_tempDateTime.day > (7 - x)))
+      return true;
+  }
   else
-    return false;
+  {
+    if(_tempDateTime.month < 11)
+      return true;
+    if((_tempDateTime.month == 11) && ((_tempDateTime.day < 14 - x) || (_tempDateTime.day == 14 - x && _tempDateTime.hour < 2)))
+      return true;
+  }
+  return false;
 }
 
 unsigned long adjustTimeZone(unsigned long _timeStamp, int _timeZone, bool _isDayLightSavingSaving) {
@@ -256,7 +283,10 @@ unsigned long adjustTimeZone(unsigned long _timeStamp, int _timeZone, bool _isDa
 
 void SetSuriseset()
 {
- 	sun.setPosition(LATITUDE, LONGITUDE, -8);
+  int dst = 0;
+  if(summerTime(UnixTimestamp))
+    dst = 1;
+ 	sun.setPosition(LATITUDE, LONGITUDE, config.timeZone/10 + dst);
 	sun.setCurrentDate(DateTime.year, DateTime.month, DateTime.day);
   if(DateTime.year > 2050 || DateTime.year < 2018)
   {

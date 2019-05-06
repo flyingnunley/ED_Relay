@@ -84,12 +84,13 @@ public:
 #include "Page_General.h"
 #include "PAGE_NetworkConfiguration.h"
 #include "Page_Schedule.h"
+#include "Page_Status.h"
 #define DEVICE_TYPE "EDRelay"
 
 //char tmpESP[100];
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttSubscribe();
-String verstr = "ED_Relay ver 2.0";
+String verstr = "ED_Relay ver 2.4";
 String HeartbeatTopic;
 
 void ESPBASE::initialize(){
@@ -202,6 +203,7 @@ void ESPBASE::httpSetup(){
   //server.on ( "/appl.html", send_application_configuration_html  );
   server.on ( "/general.html", send_general_html  );
   server.on ( "/schedule.html", send_schedule_html  );
+  server.on ("/status.html", send_status_html);
   //  server.on ( "/example.html", []() { server.send_P ( 200, "text/html", PAGE_EXAMPLE );  } );
   server.on ( "/style.css", []() {
     Serial.println("style.css");
@@ -339,14 +341,6 @@ void ESPBASE::loop()
       {
         cHeartbeat = 0;
         String message = " Still Here ";
-        uint32_t freem = system_get_free_heap_size();
-        message = message + String(freem);
-        message = message + " " + String(suntime.setHour) + ":" + String(suntime.setMin);
-        message = message + " " + String(config.RSchedule[0][0].onHour) + ":" + String(config.RSchedule[0][0].onMin) + " " + String(config.RSchedule[0][0].offHour) + ":" + String(config.RSchedule[0][0].offMin); 
-        message = message + " " + String(config.RSchedule[0][1].onHour) + ":" + String(config.RSchedule[0][1].onMin) + " " + String(config.RSchedule[0][1].offHour) + ":" + String(config.RSchedule[0][1].offMin); 
-        message = message + " " + String(config.RSchedule[1][0].onHour) + ":" + String(config.RSchedule[1][0].onMin) + " " + String(config.RSchedule[1][0].offHour) + ":" + String(config.RSchedule[1][0].offMin); 
-        message = message + " " + String(config.RSchedule[1][1].onHour) + ":" + String(config.RSchedule[1][1].onMin) + " " + String(config.RSchedule[1][1].offHour) + ":" + String(config.RSchedule[1][1].offMin); 
-        message = message + " " + String(DateTime.wday);
         mqttSend(HeartbeatTopic,"",message);
       }
       if(config.Update_Time_Via_NTP_Every <= 0)

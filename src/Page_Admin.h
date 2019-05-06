@@ -13,6 +13,7 @@ const char PAGE_AdminMainPage[] PROGMEM = R"=====(
 <a href="config.html" style="width:250px" class="btn btn--m btn--blue" >Network Configuration</a><br>
 <a href="info.html"   style="width:250px"  class="btn btn--m btn--blue" >Network Information</a><br>
 <a href="ntp.html"   style="width:250px"  class="btn btn--m btn--blue" >NTP Settings</a><br>
+<a href="status.html"   style="width:250px"  class="btn btn--m btn--blue" >Status</a><br>
 <a href="restart.html"   style="width:250px"  class="btn btn--m btn--blue" >Restart</a><br>
 
 

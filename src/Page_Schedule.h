@@ -98,6 +98,7 @@ void send_schedule_html()
         strcat(pagen,"function load(e,t,n){\n  if(\"js\"==t){\n    var a=document.createElement(\"script\");\n    a.src=e,a.type=\"text/javascript\",a.async=!1,a.onload=function(){\n      n()\n    },document.getElementsByTagName(\"head\")[0].appendChild(a)\n  }else if(\"css\"==t){\n    var a=document.createElement(\"link\");\n    a.href=e,a.rel=\"stylesheet\",a.type=\"text/css\",a.async=!1,a.onload=function(){\n      n()\n    },document.getElementsByTagName(\"head\")[0].appendChild(a)\n  }\n}");
         strcat(pagen,"</script>");
         Serial.println(String(strlen(pagen)));
+//        Serial.println(pagen);
         server.send ( 200, "text/html", pagen );
         free(pagen);
         free(line);
@@ -207,7 +208,15 @@ void send_schedule_html()
                 Serial.println(" not");
         }
 		WriteConfig();
-        server.send ( 200, "text/html", "bye" );
+        if(config.RSchedule[0][0].onatsunset)
+        {
+            server.send ( 200, "text/html", "on at sunset" );
+        }
+        else
+        {
+            server.send ( 200, "text/html", "not on at sunset" );
+        }
+        
     }
 }
 
