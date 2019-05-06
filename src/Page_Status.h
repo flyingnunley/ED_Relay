@@ -23,7 +23,7 @@ void send_status_html()
     sprintf(tstr,"<tr><td>suntime</td><td>Rise %02d:%02d Set %02d:%02d</td></tr>",suntime.riseHour,suntime.riseMin,suntime.setHour,suntime.setMin);
     strcat(PAGE_Status,tstr);
     uint32_t freem = system_get_free_heap_size();
-    sprintf(tstr,"<tr><td>Free Memory</td><td>%d</td><td>",freem);
+    sprintf(tstr,"<tr><td>Free Memory</td><td>%d</td></tr>",freem);
     strcat(PAGE_Status,tstr);
     sprintf(tstr,"<tr><td>Relay 1</td><td>1 on %02d:%02d 1 off %02d:%02d 2 on %02d:%02d 2 off %02d:%02d</td></tr>",config.RSchedule[0][0].onHour,config.RSchedule[0][0].onMin,config.RSchedule[0][0].offHour,config.RSchedule[0][0].offMin,config.RSchedule[0][1].onHour,config.RSchedule[0][1].onMin,config.RSchedule[0][1].offHour,config.RSchedule[0][1].offMin);
     strcat(PAGE_Status,tstr);
