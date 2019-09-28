@@ -90,7 +90,7 @@ public:
 //char tmpESP[100];
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttSubscribe();
-String verstr = "ED_Relay ver 2.4";
+String verstr = "ED_Relay ver 2.5";
 String HeartbeatTopic;
 
 void ESPBASE::initialize(){
