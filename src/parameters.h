@@ -41,6 +41,11 @@ struct strConfig {
   Sched RSchedule[2][10];                     // 40 Bytes EEPROM 269
 } config;
 
+/*************
+* Packs the schedule into 32 bits (4 bytes) and returns as a long
+* |onHour           |onMin            |offHour       |offMin           |ss|sr|days active         |
+* |00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|
+*************/
 long packSched(Sched shed)
 {
   long packed = shed.onHour;
@@ -72,18 +77,24 @@ Sched unpackSched(long packed)
   return shed;
 }
 
-  //  Auxiliar function to handle EEPROM
-  // EEPROM-parameters
-  void EEPROMWriteint(int address, int value){
+/*****************
+* Write an integer to eeprom
+******************/
+void EEPROMWriteint(int address, int value)
+{
     byte two = (value & 0xFF);
     byte one = ((value >> 8) & 0xFF);
 
     //Write the 4 bytes into the eeprom memory.
     EEPROM.write(address, two);
     EEPROM.write(address + 1, one);
-  }
+}
 
-  void EEPROMWritelong(int address, long value){
+/********************
+* Write a long to eeprom
+********************/
+void EEPROMWritelong(int address, long value)
+{
     byte four = (value & 0xFF);
     byte three = ((value >> 8) & 0xFF);
     byte two = ((value >> 16) & 0xFF);
@@ -94,18 +105,26 @@ Sched unpackSched(long packed)
     EEPROM.write(address + 1, three);
     EEPROM.write(address + 2, two);
     EEPROM.write(address + 3, one);
-  }
+}
 
-  int EEPROMReadint(long address){
+/******************
+* Read an int from eeprom
+******************/
+int EEPROMReadint(long address)
+{
     //Read the 4 bytes from the eeprom memory.
     long two = EEPROM.read(address);
     long one = EEPROM.read(address + 1);
 
     //Return the recomposed long by using bitshift.
     return ((two << 0) & 0xFF) + ((one << 8) & 0xFFFF);
-  }
+}
 
-  long EEPROMReadlong(long address){
+/*********************
+* Read a long from eeprom
+*********************/
+long EEPROMReadlong(long address)
+{
     //Read the 4 bytes from the eeprom memory.
     long four = EEPROM.read(address);
     long three = EEPROM.read(address + 1);
@@ -114,18 +133,26 @@ Sched unpackSched(long packed)
 
     //Return the recomposed long by using bitshift.
     return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
-  }
+}
 
-  void WriteStringToEEPROM(int beginaddress, String string){
+/******************
+* Write a String to eeprom
+*******************/
+void WriteStringToEEPROM(int beginaddress, String string)
+{
     char  charBuf[string.length() + 1];
     string.toCharArray(charBuf, string.length() + 1);
     for (int t =  0; t < sizeof(charBuf); t++)
     {
       EEPROM.write(beginaddress + t, charBuf[t]);
     }
-  }
+}
 
-  String  ReadStringFromEEPROM(int beginaddress){
+/***********************
+* Read a String from eeprom
+***********************/
+String  ReadStringFromEEPROM(int beginaddress)
+{
     volatile byte counter = 0;
     char rChar;
     String retString = "";
@@ -139,21 +166,28 @@ Sched unpackSched(long packed)
 
     }
     return retString;
-  }
+}
 
-  void WriteConfig(){
-//    Serial.println("Saving config");
+/*************************
+* Write the config structure to eeprom
+*************************/
+void WriteConfig()
+{
+//**********************************
+    // first four bytes are the config version
+    // this is used to determine if what is in the eeprom
+    // is compatible with this version of the code
     String cfgver = CFGVER;
     char ccfgver[5];
     cfgver.toCharArray(ccfgver,5);
 
-    Serial.print("Writing Config ");
-    Serial.println(ccfgver);
+//    Serial.print("Writing Config ");
+//    Serial.println(ccfgver);
     EEPROM.write(0, ccfgver[0]);
     EEPROM.write(1, ccfgver[1]);
     EEPROM.write(2, ccfgver[2]);
     EEPROM.write(3, ccfgver[3]);
-
+//***********************************
     EEPROM.write(16, config.dhcp);
     EEPROM.write(17, config.isDayLightSaving);
 
@@ -201,14 +235,22 @@ Sched unpackSched(long packed)
     EEPROM.commit();
   }
 
-  boolean ReadConfig(){
-    Serial.println("Reading Configuration");
+/**************************************
+* Read the configuration from eeprom
+***************************************/
+boolean ReadConfig()
+{
+//    Serial.println("Reading Configuration");
+    // the first 5 bytes are the configuration
+    // compare this to the first 5 bytes in the eeprom to see if this is the correct version
+    //************************************************************
     String cfgver = CFGVER;
     char ccfgver[5];
     cfgver.toCharArray(ccfgver,5);
     if (EEPROM.read(0) == cfgver[0] && EEPROM.read(1) == cfgver[1] && EEPROM.read(2) == cfgver[2] && EEPROM.read(3) == cfgver[3] )
     {
-      Serial.println("Configurarion Found!");
+//****************************************************************
+//      Serial.println("Configurarion Found!");
       config.dhcp = 	EEPROM.read(16);
       config.isDayLightSaving = EEPROM.read(17);
       config.Update_Time_Via_NTP_Every = EEPROMReadlong(18); // 4 Byte
@@ -246,17 +288,14 @@ Sched unpackSched(long packed)
       }
       config.Relay1Name = ReadStringFromEEPROM(349);                 // up to 16 Byte - EEPROM 292
       config.Relay2Name = ReadStringFromEEPROM(365);                 // up to 16 Byte - EEPROM 308
-      // Application parameters here ... from EEPROM 456 to 511
-
       return true;
-
     }
     else
     {
       Serial.println("Configurarion NOT FOUND!!!!");
       return false;
     }
-  }
+}
 
 String formatConfig(){
   String outstring = "";
