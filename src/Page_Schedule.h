@@ -1,3 +1,4 @@
+#define NUMSHED 5
 char *ROnTimeH = "ROnTimeH";
 char *ROffTimeH = "ROffTimeH";
 char *ROnTimeM = "ROnTimeM";
@@ -53,7 +54,7 @@ void send_schedule_html()
             strcat(pagen,crdx);
             strcat(pagen,"</td></tr>\n");
             itoa(r,crdx,10);
-            for(int i=0;i<10;i++)
+            for(int i=0;i<NUMSHED;i++)
             {
                 itoa(i,cidx,10);
                 strcpy(line,crdx);
@@ -106,7 +107,7 @@ void send_schedule_html()
     else
     {
         for(int r=0;r<2;r++)
-            for(int i=0;i<10;i++)
+            for(int i=0;i<NUMSHED;i++)
                 for(int j=0;j<7;j++)
                     config.RSchedule[r][i].wdays[j] = false;
         config.RSchedule[0][0].onatsunset = false;
@@ -143,7 +144,7 @@ void send_schedule_html()
             for(int r=0;r<2;r++)
             {
                 itoa(r,crdx,10);
-                for(int i=0;i<10;i++)
+                for(int i=0;i<NUMSHED;i++)
                 {
                     itoa(i,cidx,10);
                     char pname[20];
@@ -241,7 +242,7 @@ void send_schedule_configuration_values_html()
     for(int r=0;r<2;r++)
     {
         itoa(r,crdx,10);
-        for(int i=0;i<10;i++)
+        for(int i=0;i<NUMSHED;i++)
         {
             itoa(i,cidx,10);
             strcpy(line,crdx);
