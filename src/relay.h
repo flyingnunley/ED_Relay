@@ -9,9 +9,11 @@ class relay
     int pin;
     String name;
     long offTime;
-    long onTime;    
+    long onTime;
+    unsigned long AutoOffTime;
+    unsigned long AutoOffSeconds;    
 public:
-    relay(int Pin, String Name);
+    relay(int Pin, String Name,unsigned long autoOffSeconds);
     void setState(byte State); 
     void toggle();
     byte getState() {return state;};
@@ -23,7 +25,7 @@ public:
     void tick();
 };
 
-relay::relay(int Pin,String Name)
+relay::relay(int Pin,String Name,unsigned long autoOffSeconds)
 {
   pin=Pin;
   pinMode(pin,OUTPUT);
@@ -31,6 +33,7 @@ relay::relay(int Pin,String Name)
   name = Name;
   offTime = 0;
   onTime = 0;
+  AutoOffSeconds = autoOffSeconds;
 }
 
 void relay::setState(byte State)
@@ -40,13 +43,15 @@ void relay::setState(byte State)
   if(state==1)
   {
     digitalWrite(pin,HIGH);
+    if(AutoOffSeconds > 0 && offTime == 0)
+      offTime = AutoOffSeconds;
   }
   else
   {
-      digitalWrite(pin,LOW);
+    digitalWrite(pin,LOW);
   }
-  if(state != oldstate)
-    sendStatus();
+//  if(state != oldstate)
+  sendStatus();
 }
 
 void relay::toggle()

@@ -34,6 +34,10 @@ const char PAGE_AdminGeneralSettings[] PROGMEM =  R"=====(
   <td><input type="text" id="Relay2Name" name="Relay2Name" value=""></td>
 </tr>
 <tr>
+  <td align="right">Auto off seconds</td>
+  <td><input type="text" id="AutoOffSeconds" name="AutoOffSeconds" value=""></td>
+</tr>
+<tr>
   <td align="right">Heartbeat Every</td>
   <td><input type="text" id="HeartbeatEvery" name="HeartbeatEvery" value=""></td>
 </tr>
@@ -85,6 +89,7 @@ void send_devicename_value_html()
   values += "MQTTPort|" + (String) config.MQTTPort + "|div\n";
   values += "Relay1Name|" + (String) config.Relay1Name + "|div\n";
   values += "Relay2Name|" + (String) config.Relay2Name + "|div\n";
+	values += "AutoOffSeconds|" + (String) config.AutoOffSeconds + "|div\n";
 	values += "HeartbeatEvery|" + (String) config.HeartbeatEvery + "|div\n";
 	server.send ( 200, "text/plain", values);
 //  Serial.println(values);
@@ -104,6 +109,7 @@ void send_general_html()
       if (server.argName(i) == "MQTTPort") config.MQTTPort = server.arg(i).toInt();
       if (server.argName(i) == "Relay1Name") config.Relay1Name = urldecode(server.arg(i));
       if (server.argName(i) == "Relay2Name") config.Relay2Name = urldecode(server.arg(i));
+      if (server.argName(i) == "AutoOffSeconds") config.AutoOffSeconds = server.arg(i).toInt();
       if (server.argName(i) == "HeartbeatEvery") config.HeartbeatEvery = server.arg(i).toInt();
 		}
 		WriteConfig();
@@ -124,6 +130,7 @@ void send_general_configuration_values_html()
   values += "MQTTPort|" +  (String)  config.MQTTPort +  "|input\n";
   values += "Relay1Name|" +  (String)  config.Relay1Name +  "|input\n";
   values += "Relay2Name|" +  (String)  config.Relay2Name +  "|input\n";
+  values += "AutoOffSeconds|" + (String) config.AutoOffSeconds + "|input\n";
   values += "HeartbeatEvery|" + (String) config.HeartbeatEvery + "|input\n";
 	server.send ( 200, "text/plain", values);
   Serial.println(values);

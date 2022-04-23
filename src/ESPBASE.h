@@ -90,7 +90,7 @@ public:
 //char tmpESP[100];
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttSubscribe();
-String verstr = "ED_Relay ver 2.5";
+String verstr = "ED_Relay ver 2.10t";
 String HeartbeatTopic;
 
 void ESPBASE::initialize(){
@@ -173,8 +173,13 @@ void ESPBASE::initialize(){
     #ifdef ARDUINO_ESP32_DEV
       tkSecond.attach(1000000, ISRsecondTick);
     #elif ARDUINO_ESP8266_ESP01 || ARDUINO_ESP8266_NODEMCU
-      tkSecond.attach(1, ISRsecondTick);
+//      tkSecond.attach(1, ISRsecondTick);
     #endif
+      Ticker ticker1(ISRsecondTick, 1000, 1, MILLIS);
+      ticker1.start();
+//      tkSecond.setCallback(ISRsecondTick);
+//      tkSecond.setInterval(1000);
+//      tkSecond.start();    //#endif
     cNTP_Update = config.Update_Time_Via_NTP_Every * 60 - 10;
     Serial.println("Ready");
 
@@ -349,20 +354,24 @@ void ESPBASE::loop()
       {
         unsigned long oldtimestamp = UnixTimestamp;
         cNTP_Update = 0;
-        getNTPtime();
-        Serial.println("Time variance = " + String(UnixTimestamp-oldtimestamp));
-        mqttSend("Timevarience "+config.DeviceName,String(UnixTimestamp-oldtimestamp),"");
-        if(UnixTimestamp-oldtimestamp > 2 && config.Update_Time_Via_NTP_Every > 0)
+        if(getNTPtime())
         {
-          config.Update_Time_Via_NTP_Every--;
+          Serial.println("Time variance = " + String(UnixTimestamp-oldtimestamp));
+          mqttSend("Timevarience "+config.DeviceName,String(UnixTimestamp-oldtimestamp),"");
+          if(UnixTimestamp-oldtimestamp > 2 && config.Update_Time_Via_NTP_Every > 0)
+          {
+            config.Update_Time_Via_NTP_Every--;
+          }
+          if(UnixTimestamp-oldtimestamp < 2)
+          {
+            config.Update_Time_Via_NTP_Every++;
+          }
+          SetSuriseset();
+          if(!suntime.valid)
+            cNTP_Update = config.Update_Time_Via_NTP_Every * 60;
         }
-        if(UnixTimestamp-oldtimestamp < 2)
-        {
-          config.Update_Time_Via_NTP_Every++;
-        }
-        SetSuriseset();
-        if(!suntime.valid)
-          cNTP_Update = config.Update_Time_Via_NTP_Every * 60;
+        else
+          mqttSend("NoTime " + config.DeviceName,"Unable to get time","");
       }
     }
   }

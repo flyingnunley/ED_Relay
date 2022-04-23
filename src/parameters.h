@@ -39,6 +39,7 @@ struct strConfig {
   String Relay1Name;                 // up to 16 Byte - EEPROM 349
   String Relay2Name;                 // up to 16 Byte - EEPROM 365
   Sched RSchedule[2][10];                     // 40 Bytes EEPROM 269
+  unsigned long AutoOffSeconds;
 } config;
 
 long packSched(Sched shed)
@@ -195,7 +196,7 @@ Sched unpackSched(long packed)
     }
     WriteStringToEEPROM(349, config.Relay1Name);                 // up to 16 Byte - EEPROM 292
     WriteStringToEEPROM(365, config.Relay2Name);                 // up to 16 Byte - EEPROM 308
-
+    EEPROMWritelong(381,config.AutoOffSeconds);
       // Application Settings here... from EEPROM 392 up to 511 (0 - 511)
 
     EEPROM.commit();
@@ -247,7 +248,7 @@ Sched unpackSched(long packed)
       config.Relay1Name = ReadStringFromEEPROM(349);                 // up to 16 Byte - EEPROM 292
       config.Relay2Name = ReadStringFromEEPROM(365);                 // up to 16 Byte - EEPROM 308
       // Application parameters here ... from EEPROM 456 to 511
-
+      config.AutoOffSeconds = EEPROMReadlong(381);
       return true;
 
     }

@@ -128,7 +128,8 @@ boolean summerTime(unsigned long _timeStamp );
 */
 /***************************************************/
 
-void getNTPtime(){
+bool getNTPtime()
+{
   unsigned long _unixTime = 0;
 
   if (WiFi.status() == WL_CONNECTED)
@@ -152,17 +153,19 @@ void getNTPtime(){
     UDPNTPClient.write(packetBuffer, NTP_PACKET_SIZE);
     UDPNTPClient.endPacket();
 
-    delay(1000);
+    delay(2000);
 
     int cb = UDPNTPClient.parsePacket();
     if (cb == 0) 
     {
       Serial.println("No NTP packet yet");
+      return false;
     }
     else
     {
-      Serial.print("NTP packet received, length=");
-      Serial.println(cb);
+      Serial.print("Got response from " + config.ntpServerName + " ");
+      Serial.print(cb);
+      Serial.println(" bytes");
       UDPNTPClient.read(packetBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
       unsigned long highWord = word(packetBuffer[40], packetBuffer[41]);
       unsigned long lowWord = word(packetBuffer[42], packetBuffer[43]);
@@ -180,6 +183,7 @@ void getNTPtime(){
   if (_unixTime > 0) UnixTimestamp = _unixTime; // store universally available time stamp
   Serial.println(String(UnixTimestamp) + ":" + String(_unixTime));
   unsigned long testtime = UnixTimestamp;
+  return true;
 /* for testing daylight savings time  
   for(int i=0;i<20;i++)
   {

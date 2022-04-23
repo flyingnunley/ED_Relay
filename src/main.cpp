@@ -2,6 +2,7 @@
 #include <PubSubClient.h>
 #include "ESPBASE.h"
 #include "relay.h"
+#include "statusIndicator.h"
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -9,6 +10,7 @@ const byte mqttDebug = 1;
 #define RELAY1_PIN 12
 #define RELAY2_PIN 13
 #define STATUS_LED 16
+bool statusledon = false;
 relay* Relay[2];
 String sChipID;
 long lastReconnectAttempt = 0;         // used for a millisecond timer to reconnect to mqtt broker if disconnected
@@ -18,27 +20,36 @@ String StatusTopic;
 unsigned long reporttimemilli = 600000;
 unsigned long lastreporttime = 0;
 String ScheduleTopic;
-
+int loopcount = 0;
 ESPBASE Esp;
 void sendStatus();
+unsigned int statusmode = 0;
+statusIndicator* statflash;
 
 void setup() {
   Serial.begin(115200);
+  statflash = new statusIndicator(STATUS_LED);
+  statflash->setStatus(2);
   char cChipID[10];
   sprintf(cChipID,"%08X",ESP.getChipId());
   sChipID = String(cChipID);
 
   Esp.initialize();
+  pinMode(STATUS_LED,OUTPUT);
   RelayTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/command";
   StatusTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/status";
   ScheduleTopic = String(DEVICE_TYPE) + "/" + config.DeviceName + "/schedule";
-  Relay[0] = new relay(RELAY1_PIN,config.Relay1Name);
-  Relay[1] = new relay(RELAY2_PIN,config.Relay2Name);
+  Relay[0] = new relay(RELAY1_PIN,config.Relay1Name,config.AutoOffSeconds);
+  Relay[1] = new relay(RELAY2_PIN,config.Relay2Name,config.AutoOffSeconds);
   Esp.setupMQTTClient();
   customWatchdog = millis();
 
   Serial.println("Done with setup");
   Serial.println(config.ssid);
+  if(!Esp.WIFI_connected)
+    statflash->setStatus(2);
+  else
+    statflash->setStatus(1);
 }
 
 void setSchedule(int relay)
@@ -105,7 +116,17 @@ void setSchedule(int relay)
 
 void loop() 
 {
+  loopcount++;
   Esp.loop();
+  statflash->loop();
+  if(!Esp.WIFI_connected)
+    statflash->setStatus(2);
+  else if(DateTime.year > 2050 || DateTime.year < 2018)
+      statflash->setStatus(3);
+    else if(!Esp.mqttClient->connected())
+        statflash->setStatus(4);
+        else
+          statflash->setStatus(1);
   if(millis() > lastreporttime + reporttimemilli)
   {
     if(config.ReportTime)
@@ -286,4 +307,15 @@ void mainTick()
 {
   Relay[0]->tick();
   Relay[1]->tick();
+  //if(statusledon)
+  //{
+  //  digitalWrite(STATUS_LED,LOW);
+  //  statusledon = false;
+  //}
+  //else
+  //{
+  //  digitalWrite(STATUS_LED,HIGH);
+  //  statusledon = true;
+ // }
+  //Serial.println(loopcount);
 }
