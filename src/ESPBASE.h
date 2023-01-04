@@ -173,7 +173,8 @@ void ESPBASE::initialize(){
     #ifdef ARDUINO_ESP32_DEV
       tkSecond.attach(1000000, ISRsecondTick);
     #elif ARDUINO_ESP8266_ESP01 || ARDUINO_ESP8266_NODEMCU
-      tkSecond.attach(1, ISRsecondTick);
+      tkSecond.setInterval(1000);
+      tkSecond.setCallback(ISRsecondTick);
     #endif
     cNTP_Update = config.Update_Time_Via_NTP_Every * 60 - 10;
     Serial.println("Ready");
